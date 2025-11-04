@@ -120,7 +120,7 @@
         <h2>💰 Configuración Inicial</h2>
         <div class="config-item">
             <span>Valor actual de la Caja:</span>
-            <span id="cajaValueDisplay" class="caja-display">$100</span>
+            <span id="cajaValueDisplay" class="caja-display">$10000</span>
         </div>
         <div class="config-item">
             <label for="cajaValue">Nuevo Valor (Entero):</label>
@@ -169,20 +169,22 @@
 
 <script>
     // Variables globales para el estado del juego
-    let cajaValue = 100; // Valor predeterminado
+    // CAMBIO 1: Valor por defecto de la caja actualizado a $10000
+    let cajaValue = 10000;
+    
+    // CAMBIO 2: Nombres de los jugadores por defecto actualizados
     let allPlayers = [
-        { id: 1, name: 'Alice', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        { id: 2, name: 'Bob', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        { id: 3, name: 'Charlie', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        { id: 4, name: 'David', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        { id: 5, name: 'Eve', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        { id: 6, name: 'Frank', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        // Puedes agregar más jugadores aquí si lo necesitas
+        { id: 1, name: 'Leo', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
+        { id: 2, name: 'Diego', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
+        { id: 3, name: 'Juan', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
+        { id: 4, name: 'Tano', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
+        { id: 5, name: 'Miguel', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
+        { id: 6, name: 'Ale', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
     ];
 
     // --- FUNCIONES DE UTILIDAD Y CONFIGURACIÓN ---
 
-    function updateCajaValue() {
+    window.updateCajaValue = function() {
         const input = document.getElementById('cajaValue');
         const newValue = parseFloat(input.value);
         
@@ -198,15 +200,15 @@
         input.value = ''; // Limpia el input
     }
 
-    function togglePlayer(id) {
+    window.togglePlayer = function(id) {
         const player = allPlayers.find(p => p.id === id);
         if (player) {
             player.active = !player.active;
         }
-        window.renderPlayerSelection(); // Uso de window. para evitar posibles errores
+        window.renderPlayerSelection();
     }
 
-    function renderPlayerSelection() {
+    window.renderPlayerSelection = function() {
         const container = document.getElementById('playerSelection');
         container.innerHTML = '';
         allPlayers.forEach(player => {
@@ -222,7 +224,7 @@
 
     // --- FUNCIONES DE JUEGO ---
 
-    function iniciarPartida() {
+    window.iniciarPartida = function() {
         const activePlayers = allPlayers.filter(p => p.active);
         
         if (activePlayers.length < 2) {
@@ -250,7 +252,7 @@
         window.renderActivePlayers();
     }
 
-    function renderActivePlayers() {
+    window.renderActivePlayers = function() {
         const container = document.getElementById('activePlayersList');
         container.innerHTML = '';
 
@@ -269,7 +271,7 @@
         });
     }
 
-    function pedirCaja(id) {
+    window.pedirCaja = function(id) {
         const player = allPlayers.find(p => p.id === id);
         if (player) {
             player.cajas += 1;
@@ -277,7 +279,7 @@
         }
     }
 
-    function actualizarFichas(id) {
+    window.actualizarFichas = function(id) {
         const player = allPlayers.find(p => p.id === id);
         if (player) {
             let fichas = prompt(`Ingrese la cantidad de Fichas FINALES de ${player.name}:`);
@@ -292,7 +294,7 @@
         }
     }
 
-    function cambiarValorCaja() {
+    window.cambiarValorCaja = function() {
         let nuevoValor = prompt(`Ingrese el nuevo valor de la caja (actual: $${cajaValue}):`);
         nuevoValor = parseInt(nuevoValor);
 
@@ -309,7 +311,7 @@
 
     // --- FUNCIONES DE RESULTADOS ---
 
-    function finalizarJuego() {
+    window.finalizarJuego = function() {
         const activePlayers = allPlayers.filter(p => p.active);
 
         // 1. Verificación de Fichas
@@ -340,7 +342,7 @@
         window.renderResults(results);
     }
 
-    function renderResults(results) {
+    window.renderResults = function(results) {
         const container = document.getElementById('resultsList');
         container.innerHTML = '';
         let sumTotal = 0;
@@ -354,4 +356,68 @@
             if (result.netMoney > 0) {
                 statusClass = 'gain';
                 message = `Gana: +$${Math.abs(result.netMoney)}`;
-            } else if (result.netMoney < 0
+            } else if (result.netMoney < 0) {
+                statusClass = 'loss';
+                message = `Pierde: -$${Math.abs(result.netMoney)}`;
+            } else {
+                statusClass = 'no-change';
+                message = 'A mano: $0';
+            }
+
+            div.innerHTML = `
+                <span>${result.name}</span>
+                <span class="${statusClass}">${message}</span>
+            `;
+            container.appendChild(div);
+            sumTotal += result.netMoney;
+        });
+
+        // 5. Verificar Suma (Debe ser cero)
+        const sumCheckDiv = document.getElementById('sumCheck');
+        if (Math.abs(sumTotal) < 0.01) { // Usamos una pequeña tolerancia
+            sumCheckDiv.className = 'gain';
+            sumCheckDiv.textContent = `✅ La suma es $0.00. El cálculo es correcto.`;
+        } else {
+            sumCheckDiv.className = 'loss';
+            sumCheckDiv.textContent = `❌ ERROR: La suma NO es cero. Faltan $${sumTotal.toFixed(2)}`;
+        }
+    }
+
+
+    window.resetearJuego = function() {
+        if (!confirm('¿Estás seguro de que quieres empezar una nueva partida? Se perderán los datos actuales.')) {
+            return;
+        }
+
+        // Resetear visualización
+        document.getElementById('configSection').style.display = 'block';
+        document.getElementById('gameSection').style.display = 'none';
+        document.getElementById('resultsSection').style.display = 'none';
+        
+        // Resetear jugadores
+        allPlayers.forEach(player => {
+            player.active = false;
+            player.cajas = 0;
+            player.initialFichas = 0;
+            player.finalFichas = 0;
+        });
+
+        // Reinicializar la vista
+        window.init();
+    }
+
+    // --- INICIALIZACIÓN ---
+
+    window.init = function() {
+        document.getElementById('cajaValueDisplay').textContent = `$${cajaValue}`;
+        window.renderPlayerSelection();
+    }
+
+    // Inicializar al cargar la página
+    window.onload = function() {
+        window.init();
+    };
+</script>
+
+</body>
+</html>
