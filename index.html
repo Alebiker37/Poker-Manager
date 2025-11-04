@@ -109,12 +109,32 @@
             font-weight: bold;
             color: #007bff;
         }
+        .time-display {
+            font-size: 0.9em;
+            color: #888;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .ranking-item {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            padding: 5px 0;
+            border-bottom: 1px dashed #eee;
+            font-size: 0.9em;
+        }
+        .ranking-header {
+            font-weight: bold;
+            border-bottom: 2px solid #ccc;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>♠️ Poker Manager ♣️</h1>
+    <div id="timeDisplay" class="time-display"></div>
 
     <div id="configSection">
         <h2>💰 Configuración Inicial</h2>
@@ -131,6 +151,10 @@
         <h2>👥 Selecciona Jugadores</h2>
         <div id="playerSelection" class="player-list">
             </div>
+
+        <div style="text-align: center; margin-top: 10px;">
+            <button class="btn btn-secondary" onclick="window.addGuestPlayer()">➕ Agregar Invitado</button>
+        </div>
 
         <div style="text-align: center; margin-top: 20px;">
             <button class="btn btn-success" onclick="window.iniciarPartida()">🎮 Iniciar Partida</button>
@@ -155,7 +179,7 @@
     </div>
 
     <div id="resultsSection" style="display:none;">
-        <h2>📊 Resultados Finales</h2>
+        <h2>📊 Resultados de la Partida</h2>
         <div id="resultsList">
             </div>
         <div id="sumCheck" style="margin-top: 15px; font-weight: bold;"></div>
@@ -164,40 +188,104 @@
             <button class="btn btn-warning" onclick="window.resetearJuego()">🔄 Nueva Partida</button>
         </div>
     </div>
-
-</div>
+    
+    <div id="rankingSection">
+        <h2>🏆 Ranking Acumulado de Ganancias</h2>
+        <div id="rankingGanancias"></div>
+        
+        <h2>📉 Ranking Acumulado de Pérdidas</h2>
+        <div id="rankingPerdidas"></div>
+    </div>
+    </div>
 
 <script>
-    // Variables globales para el estado del juego
-    // CAMBIO 1: Valor por defecto de la caja actualizado a $10000
+    // Variables globales
     let cajaValue = 10000;
-    
-    // CAMBIO 2: Nombres de los jugadores por defecto actualizados
+    let nextPlayerId = 7;
     let allPlayers = [
-        { id: 1, name: 'Leo', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        { id: 2, name: 'Diego', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        { id: 3, name: 'Juan', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        { id: 4, name: 'Tano', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        { id: 5, name: 'Miguel', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
-        { id: 6, name: 'Ale', active: false, cajas: 0, initialFichas: 0, finalFichas: 0 },
+        { id: 1, name: 'Leo', active: false, cajas: 0, initialFichas: 0, finalFichas: 0, isGuest: false, acumulado: 0 },
+        { id: 2, name: 'Diego', active: false, cajas: 0, initialFichas: 0, finalFichas: 0, isGuest: false, acumulado: 0 },
+        { id: 3, name: 'Juan', active: false, cajas: 0, initialFichas: 0, finalFichas: 0, isGuest: false, acumulado: 0 },
+        { id: 4, name: 'Tano', active: false, cajas: 0, initialFichas: 0, finalFichas: 0, isGuest: false, acumulado: 0 },
+        { id: 5, name: 'Miguel', active: false, cajas: 0, initialFichas: 0, finalFichas: 0, isGuest: false, acumulado: 0 },
+        { id: 6, name: 'Ale', active: false, cajas: 0, initialFichas: 0, finalFichas: 0, isGuest: false, acumulado: 0 },
     ];
+    let intervalId; 
+    
+    // Nueva variable para el historial de partidas
+    let gameHistory = []; 
 
+    // --- MANEJO DE ALMACENAMIENTO (LOCALSTORAGE) ---
+
+    window.saveState = function() {
+        // Guarda el historial y los datos acumulados
+        localStorage.setItem('pokerManager_history', JSON.stringify(gameHistory));
+        localStorage.setItem('pokerManager_players', JSON.stringify(allPlayers.filter(p => !p.isGuest)));
+    }
+
+    window.loadState = function() {
+        // Carga el historial
+        const storedHistory = localStorage.getItem('pokerManager_history');
+        if (storedHistory) {
+            gameHistory = JSON.parse(storedHistory);
+        }
+
+        // Carga los jugadores base (no invitados)
+        const storedPlayers = localStorage.getItem('pokerManager_players');
+        if (storedPlayers) {
+            const loadedPlayers = JSON.parse(storedPlayers);
+            
+            // Mantenemos solo los jugadores base y actualizamos sus acumulados
+            allPlayers.forEach(player => {
+                const loadedPlayer = loadedPlayers.find(lp => lp.name === player.name);
+                if (loadedPlayer) {
+                    player.acumulado = loadedPlayer.acumulado;
+                }
+            });
+        }
+    }
+    
+    // --- FUNCIONES DE ALARMAS Y TIEMPO ---
+    // (Funciones checkAlarms, startAlarms, y la actualización de timeDisplay, quedan igual)
+    
+    window.checkAlarms = function() {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const timeDisplay = document.getElementById('timeDisplay');
+        
+        const formattedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        timeDisplay.textContent = `Hora actual: ${formattedTime}`;
+
+        if (hours === 22 && minutes === 0) {
+            alert('🚨 ¡ALARMA! 🚨\n\nHORA DE PRENDER EL HORNO Y PREPARAR LA COMIDA.\n\n(Alarma 22:00)');
+        }
+
+        if (hours === 23 && minutes === 55) {
+            alert('🛑 ¡ATENCIÓN! 🛑\n\nHORA DE LA ÚLTIMA MANO.\n\n(Alarma 23:55)');
+        }
+    }
+
+    window.startAlarms = function() {
+        intervalId = setInterval(window.checkAlarms, 60000); 
+        window.checkAlarms();
+    }
+    
     // --- FUNCIONES DE UTILIDAD Y CONFIGURACIÓN ---
 
     window.updateCajaValue = function() {
         const input = document.getElementById('cajaValue');
         const newValue = parseFloat(input.value);
         
-        // Validación: debe ser un número entero mayor a 0
         if (newValue <= 0 || isNaN(newValue) || newValue % 1 !== 0) { 
             alert('⚠️ Por favor ingrese un valor de caja entero válido mayor a 0');
-            input.value = cajaValue; // Restaura el valor anterior
+            input.value = cajaValue;
             return;
         }
 
         cajaValue = newValue;
         document.getElementById('cajaValueDisplay').textContent = `$${cajaValue}`;
-        input.value = ''; // Limpia el input
+        input.value = '';
     }
 
     window.togglePlayer = function(id) {
@@ -207,6 +295,24 @@
         }
         window.renderPlayerSelection();
     }
+    
+    window.addGuestPlayer = function() {
+        const guestName = prompt("Ingrese el nombre del jugador invitado:");
+        if (guestName && guestName.trim() !== '') {
+            const newPlayer = {
+                id: nextPlayerId++,
+                name: guestName.trim() + ' (Inv.)',
+                active: true,
+                cajas: 0,
+                initialFichas: 0,
+                finalFichas: 0,
+                isGuest: true,
+                acumulado: 0 // Los invitados no tienen acumulado persistente
+            };
+            allPlayers.push(newPlayer);
+            window.renderPlayerSelection();
+        }
+    }
 
     window.renderPlayerSelection = function() {
         const container = document.getElementById('playerSelection');
@@ -214,8 +320,12 @@
         allPlayers.forEach(player => {
             const div = document.createElement('div');
             div.className = 'config-item';
+            
+            // Añadir el acumulado en la configuración
+            const acumuladoText = player.isGuest ? '' : ` ($${player.acumulado})`;
+            
             div.innerHTML = `
-                <span>${player.name}</span>
+                <span>${player.name}${acumuladoText}</span>
                 <input type="checkbox" ${player.active ? 'checked' : ''} onchange="window.togglePlayer(${player.id})">
             `;
             container.appendChild(div);
@@ -232,14 +342,13 @@
             return;
         }
 
-        // 1. Ocultar Configuración y Mostrar Juego
+        window.startAlarms();
+
         document.getElementById('configSection').style.display = 'none';
         document.getElementById('gameSection').style.display = 'block';
 
-        // 2. Mostrar el valor de la caja
         document.getElementById('cajaGameValueDisplay').textContent = `$${cajaValue}`;
 
-        // 3. Reiniciar contadores para los activos
         allPlayers.forEach(player => {
             if (player.active) {
                 player.cajas = 0;
@@ -248,10 +357,10 @@
             }
         });
 
-        // 4. Renderizar la lista de jugadores activos
         window.renderActivePlayers();
     }
-
+    
+    // (Funciones renderActivePlayers, pedirCaja, actualizarFichas, cambiarValorCaja quedan iguales)
     window.renderActivePlayers = function() {
         const container = document.getElementById('activePlayersList');
         container.innerHTML = '';
@@ -275,7 +384,7 @@
         const player = allPlayers.find(p => p.id === id);
         if (player) {
             player.cajas += 1;
-            window.renderActivePlayers(); // Actualizar la lista
+            window.renderActivePlayers();
         }
     }
 
@@ -290,7 +399,7 @@
                 return;
             }
             player.finalFichas = fichas;
-            window.renderActivePlayers(); // Actualizar la vista de fichas
+            window.renderActivePlayers();
         }
     }
 
@@ -308,38 +417,61 @@
         alert(`✅ Valor de la caja actualizado a $${cajaValue}`);
     }
 
-
-    // --- FUNCIONES DE RESULTADOS ---
+    // --- FUNCIONES DE RESULTADOS Y RANKING ---
 
     window.finalizarJuego = function() {
         const activePlayers = allPlayers.filter(p => p.active);
 
-        // 1. Verificación de Fichas
         const missingFichas = activePlayers.some(p => p.finalFichas === 0 && p.initialFichas === 0 && p.cajas > 0);
         if (missingFichas) {
             alert('⚠️ Debe ingresar la cantidad de fichas finales de TODOS los jugadores activos.');
             return;
         }
 
-        // 2. Ocultar Juego y Mostrar Resultados
+        clearInterval(intervalId);
+
         document.getElementById('gameSection').style.display = 'none';
         document.getElementById('resultsSection').style.display = 'block';
 
-        // 3. Calcular Resultados
         const results = activePlayers.map(player => {
-            // G/P = Fichas finales - Cajas compradas
             const netCajas = player.finalFichas - player.cajas;
             const netMoney = netCajas * cajaValue;
 
             return {
                 name: player.name,
                 netCajas: netCajas,
-                netMoney: netMoney
+                netMoney: netMoney,
+                isGuest: player.isGuest // Nuevo
             };
         });
+        
+        // **NUEVO: ACTUALIZACIÓN DEL HISTORIAL Y ACUMULADO**
+        const gameDate = new Date().toLocaleDateString('es-AR');
+        const gameEntry = {
+            date: gameDate,
+            results: []
+        };
+        
+        results.forEach(result => {
+            // Actualizar el acumulado solo para jugadores NO invitados
+            if (!result.isGuest) {
+                const player = allPlayers.find(p => p.name.replace(' (Inv.)', '') === result.name.replace(' (Inv.)', ''));
+                if (player) {
+                    player.acumulado = (player.acumulado || 0) + result.netMoney;
+                }
+            }
+            
+            gameEntry.results.push({
+                name: result.name,
+                netMoney: result.netMoney
+            });
+        });
 
-        // 4. Renderizar Resultados
+        gameHistory.push(gameEntry);
+        window.saveState(); // Guardar el estado actualizado
+
         window.renderResults(results);
+        window.renderRanking(); // Renderizar el nuevo ranking
     }
 
     window.renderResults = function(results) {
@@ -372,14 +504,86 @@
             sumTotal += result.netMoney;
         });
 
-        // 5. Verificar Suma (Debe ser cero)
         const sumCheckDiv = document.getElementById('sumCheck');
-        if (Math.abs(sumTotal) < 0.01) { // Usamos una pequeña tolerancia
+        if (Math.abs(sumTotal) < 0.01) {
             sumCheckDiv.className = 'gain';
             sumCheckDiv.textContent = `✅ La suma es $0.00. El cálculo es correcto.`;
         } else {
             sumCheckDiv.className = 'loss';
             sumCheckDiv.textContent = `❌ ERROR: La suma NO es cero. Faltan $${sumTotal.toFixed(2)}`;
+        }
+    }
+    
+    // **NUEVO: FUNCIÓN PARA RENDERIZAR EL RANKING**
+    window.renderRanking = function() {
+        const rankingGananciasContainer = document.getElementById('rankingGanancias');
+        const rankingPerdidasContainer = document.getElementById('rankingPerdidas');
+        
+        rankingGananciasContainer.innerHTML = '';
+        rankingPerdidasContainer.innerHTML = '';
+
+        // 1. Generar la lista de resultados para el ranking
+        const allResults = [];
+        
+        gameHistory.forEach(game => {
+            game.results.forEach(result => {
+                if (!result.name.includes('(Inv.)')) { // Excluir invitados
+                     // Obtener el acumulado actual del jugador base
+                    const player = allPlayers.find(p => p.name === result.name);
+                    const acumulado = player ? player.acumulado : 0;
+                    
+                    allResults.push({
+                        date: game.date,
+                        name: result.name,
+                        partida: result.netMoney,
+                        acumulado: acumulado
+                    });
+                }
+            });
+        });
+
+        // 2. Filtrar y ordenar ganancias
+        const ganancias = allResults
+            .filter(r => r.partida > 0)
+            .sort((a, b) => b.partida - a.partida);
+            
+        // 3. Filtrar y ordenar pérdidas
+        const perdidas = allResults
+            .filter(r => r.partida < 0)
+            .sort((a, b) => a.partida - b.partida); // Ordenar de menor (más pérdida) a mayor
+
+        // 4. Renderizar Ganancias
+        const headerGanancias = `<div class="ranking-header ranking-item"><span>Fecha</span><span>Jugador/Ganancia</span><span>Acumulado</span></div>`;
+        rankingGananciasContainer.innerHTML += headerGanancias;
+        
+        if (ganancias.length > 0) {
+            ganancias.forEach(r => {
+                rankingGananciasContainer.innerHTML += `
+                    <div class="ranking-item">
+                        <span>${r.date}</span>
+                        <span class="gain">${r.name}: +$${Math.abs(r.partida).toFixed(2)}</span>
+                        <span>$${r.acumulado.toFixed(2)}</span>
+                    </div>`;
+            });
+        } else {
+            rankingGananciasContainer.innerHTML += `<p>No hay ganancias registradas aún.</p>`;
+        }
+
+        // 5. Renderizar Pérdidas
+        const headerPerdidas = `<div class="ranking-header ranking-item"><span>Fecha</span><span>Jugador/Pérdida</span><span>Acumulado</span></div>`;
+        rankingPerdidasContainer.innerHTML += headerPerdidas;
+
+        if (perdidas.length > 0) {
+            perdidas.forEach(r => {
+                rankingPerdidasContainer.innerHTML += `
+                    <div class="ranking-item">
+                        <span>${r.date}</span>
+                        <span class="loss">${r.name}: -$${Math.abs(r.partida).toFixed(2)}</span>
+                        <span>$${r.acumulado.toFixed(2)}</span>
+                    </div>`;
+            });
+        } else {
+            rankingPerdidasContainer.innerHTML += `<p>No hay pérdidas registradas aún.</p>`;
         }
     }
 
@@ -389,18 +593,22 @@
             return;
         }
 
+        clearInterval(intervalId);
+
         // Resetear visualización
         document.getElementById('configSection').style.display = 'block';
         document.getElementById('gameSection').style.display = 'none';
         document.getElementById('resultsSection').style.display = 'none';
         
-        // Resetear jugadores
+        // Quitar invitados y resetear status de la partida
+        allPlayers = allPlayers.filter(p => !p.isGuest);
         allPlayers.forEach(player => {
             player.active = false;
             player.cajas = 0;
             player.initialFichas = 0;
             player.finalFichas = 0;
         });
+        nextPlayerId = allPlayers.length + 1;
 
         // Reinicializar la vista
         window.init();
@@ -409,8 +617,10 @@
     // --- INICIALIZACIÓN ---
 
     window.init = function() {
+        window.loadState(); // Cargar estado al inicio
         document.getElementById('cajaValueDisplay').textContent = `$${cajaValue}`;
         window.renderPlayerSelection();
+        window.renderRanking(); // Renderizar ranking al inicio
     }
 
     // Inicializar al cargar la página
