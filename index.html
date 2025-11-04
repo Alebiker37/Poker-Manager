@@ -203,7 +203,7 @@
         if (player) {
             player.active = !player.active;
         }
-        renderPlayerSelection(); // Vuelve a renderizar para actualizar el estado visual
+        window.renderPlayerSelection(); // Uso de window. para evitar posibles errores
     }
 
     function renderPlayerSelection() {
@@ -247,7 +247,7 @@
         });
 
         // 4. Renderizar la lista de jugadores activos
-        renderActivePlayers();
+        window.renderActivePlayers();
     }
 
     function renderActivePlayers() {
@@ -273,7 +273,7 @@
         const player = allPlayers.find(p => p.id === id);
         if (player) {
             player.cajas += 1;
-            renderActivePlayers(); // Actualizar la lista
+            window.renderActivePlayers(); // Actualizar la lista
         }
     }
 
@@ -288,7 +288,7 @@
                 return;
             }
             player.finalFichas = fichas;
-            renderActivePlayers(); // Actualizar la vista de fichas
+            window.renderActivePlayers(); // Actualizar la vista de fichas
         }
     }
 
@@ -313,9 +313,9 @@
         const activePlayers = allPlayers.filter(p => p.active);
 
         // 1. Verificación de Fichas
-        const missingFichas = activePlayers.some(p => p.finalFichas === 0 && p.initialFichas === 0);
+        const missingFichas = activePlayers.some(p => p.finalFichas === 0 && p.initialFichas === 0 && p.cajas > 0);
         if (missingFichas) {
-            alert('⚠️ Debe ingresar la cantidad de fichas finales (o iniciales) de TODOS los jugadores activos.');
+            alert('⚠️ Debe ingresar la cantidad de fichas finales de TODOS los jugadores activos.');
             return;
         }
 
@@ -325,14 +325,6 @@
 
         // 3. Calcular Resultados
         const results = activePlayers.map(player => {
-            // El total en dinero que el jugador metió en la mesa
-            const totalInvertido = player.cajas * cajaValue;
-            
-            // La ganancia/pérdida se calcula: Fichas Finales - Fichas Iniciales (si hubieran)
-            // Para simplificar, asumimos que si no se mete un valor inicial, Fichas Finales es el valor en Cajas.
-            // Si el jugador termina con X fichas, y cada caja vale Y fichas, su P&L es (FichasFinales - Cajas*FichasPorCaja) * DineroPorFicha.
-            // Para este modelo simple, asumimos que la ficha final es el TOTAL de cajas ganadas o perdidas.
-            
             // G/P = Fichas finales - Cajas compradas
             const netCajas = player.finalFichas - player.cajas;
             const netMoney = netCajas * cajaValue;
@@ -340,13 +332,12 @@
             return {
                 name: player.name,
                 netCajas: netCajas,
-                netMoney: netMoney,
-                totalInvertido: totalInvertido // Solo informativo
+                netMoney: netMoney
             };
         });
 
         // 4. Renderizar Resultados
-        renderResults(results);
+        window.renderResults(results);
     }
 
     function renderResults(results) {
@@ -363,66 +354,4 @@
             if (result.netMoney > 0) {
                 statusClass = 'gain';
                 message = `Gana: +$${Math.abs(result.netMoney)}`;
-            } else if (result.netMoney < 0) {
-                statusClass = 'loss';
-                message = `Pierde: -$${Math.abs(result.netMoney)}`;
-            } else {
-                statusClass = 'no-change';
-                message = 'A mano: $0';
-            }
-
-            div.innerHTML = `
-                <span>${result.name}</span>
-                <span class="${statusClass}">${message}</span>
-            `;
-            container.appendChild(div);
-            sumTotal += result.netMoney;
-        });
-
-        // 5. Verificar Suma (Debe ser cero)
-        const sumCheckDiv = document.getElementById('sumCheck');
-        if (Math.abs(sumTotal) < 0.01) { // Usamos una pequeña tolerancia para flotantes
-            sumCheckDiv.className = 'gain';
-            sumCheckDiv.textContent = `✅ La suma es $0.00. El cálculo es correcto.`;
-        } else {
-            sumCheckDiv.className = 'loss';
-            sumCheckDiv.textContent = `❌ ERROR: La suma NO es cero. Faltan $${sumTotal.toFixed(2)}`;
-        }
-    }
-
-
-    function resetearJuego() {
-        if (!confirm('¿Estás seguro de que quieres empezar una nueva partida? Se perderán los datos actuales.')) {
-            return;
-        }
-
-        // Resetear visualización
-        document.getElementById('configSection').style.display = 'block';
-        document.getElementById('gameSection').style.display = 'none';
-        document.getElementById('resultsSection').style.display = 'none';
-        
-        // Resetear jugadores
-        allPlayers.forEach(player => {
-            player.active = false;
-            player.cajas = 0;
-            player.initialFichas = 0;
-            player.finalFichas = 0;
-        });
-
-        // Reinicializar la vista
-        init();
-    }
-
-    // --- INICIALIZACIÓN ---
-
-    function init() {
-        document.getElementById('cajaValueDisplay').textContent = `$${cajaValue}`;
-        renderPlayerSelection();
-    }
-
-    // Inicializar al cargar
-    window.init(); // Usamos window.init() por seguridad en entornos como GitHub Pages
-</script>
-
-</body>
-</html>
+            } else if (result.netMoney < 0
